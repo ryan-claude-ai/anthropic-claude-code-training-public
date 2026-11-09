@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest"
 import { Payment } from "@/data/types"
-import { EXPORT_COLUMNS, exportFilename, toCsv } from "./csv"
+import {
+  DEFAULT_EXPORT_COLUMNS,
+  EXPORT_COLUMNS,
+  exportFilename,
+  parseExportOptions,
+  toCsv,
+} from "./csv"
 
 /**
  * The export is the file ops hands to a merchant, so a broken cell is a
@@ -81,5 +87,79 @@ describe("exportFilename", () => {
     expect(exportFilename(new Date("2026-03-14T23:00:00.000Z"))).toBe(
       "payments-2026-03-14.csv",
     )
+  })
+})
+
+describe("DEFAULT_EXPORT_COLUMNS", () => {
+  it("leaves out the card last four, so an export never carries it unasked", () => {
+    expect(DEFAULT_EXPORT_COLUMNS).not.toContain("last4")
+  })
+
+  it("keeps every other column, so an existing export link loses nothing else", () => {
+    expect(DEFAULT_EXPORT_COLUMNS).toEqual(
+      EXPORT_COLUMNS.filter((column) => column !== "last4"),
+    )
+  })
+})
+
+describe("parseExportOptions", () => {
+  const options = (query: string) => parseExportOptions(new URLSearchParams(query))
+
+  it("falls back to the default columns when the caller names none", () => {
+    expect(options("status=disputed")).toEqual({
+      columns: DEFAULT_EXPORT_COLUMNS,
+      scope: "filtered",
+    })
+  })
+
+  it("keeps only names on the allowlist", () => {
+    expect(options("columns=id,password,amount").columns).toEqual(["id", "amount"])
+  })
+
+  it("drops a name that is not a column rather than failing the request", () => {
+    expect(options("columns=id,../../etc/passwd").columns).toEqual(["id"])
+  })
+
+  it("collapses a repeated column", () => {
+    expect(options("columns=id,id,amount").columns).toEqual(["id", "amount"])
+  })
+
+  it("returns columns in the canonical order, whatever order they arrived in", () => {
+    expect(options("columns=currency,id,amount").columns).toEqual([
+      "id",
+      "amount",
+      "currency",
+    ])
+  })
+
+  it("keeps an explicit empty selection empty rather than defaulting", () => {
+    expect(options("columns=").columns).toEqual([])
+  })
+
+  it("keeps an all-unknown selection empty rather than defaulting", () => {
+    expect(options("columns=nope,also_nope").columns).toEqual([])
+  })
+
+  it("reads the wider scope only from the exact value", () => {
+    expect(options("scope=all").scope).toBe("all")
+    expect(options("scope=ALL").scope).toBe("filtered")
+    expect(options("scope=everything").scope).toBe("filtered")
+    expect(options("").scope).toBe("filtered")
+  })
+})
+
+describe("exportFilename scope label", () => {
+  const date = new Date("2026-08-13T23:30:00.000Z")
+
+  it("names the status when the file follows the active filter", () => {
+    expect(exportFilename(date, "disputed")).toBe("payments-disputed-2026-08-13.csv")
+  })
+
+  it("says all when the file ignores the filter", () => {
+    expect(exportFilename(date, "all")).toBe("payments-all-2026-08-13.csv")
+  })
+
+  it("stays the plain dated name when there is no label to use", () => {
+    expect(exportFilename(date, undefined)).toBe("payments-2026-08-13.csv")
   })
 })
