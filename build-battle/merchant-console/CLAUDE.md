@@ -60,3 +60,42 @@ These four explain most of the code, and breaking them is how bugs get in here.
 ## Before you push
 
 Run `npm test`, then `/ship-ready`. The skill checks the rules above, not just formatting.
+
+## Toolchain
+
+- Node 20 or newer. There is no `engines` field and no `.nvmrc`; verified working on Node 26.2.0 / npm 11.13.0.
+- `npm run dev` serves on **http://localhost:3000**.
+
+## Checks
+
+| Command | What it covers |
+| --- | --- |
+| `npm test` | Vitest, whole suite |
+| `npx vitest run src/lib/csv.test.ts` | One file, while iterating |
+| `npm run lint` | ESLint via `next lint` |
+| `npm run build` | Catches type and build errors the dev server tolerates |
+
+Run `npm run lint` as well as `npm test` before pushing. A pull request is also
+graded by `.github/workflows/anthropic-tenex-reviewer.yml`.
+
+## Org standards apply here too
+
+`docs/ORG-STANDARDS.md` at the repository root is what a reviewer cites, by item
+number. The conventions above cover items 1, 2, 4, 5, 6, 7 and 8. Three are not
+restated anywhere narrower, so they are easy to miss:
+
+- **#3 The math adds up.** Totals equal the sum of their parts. Gross, net, fees
+  and refunds reconcile; a number shown twice is derived once.
+- **#9 Match the neighborhood.** New code follows the naming, layout and
+  component patterns of the files around it.
+- **#10 No debris.** No `console.log`, no commented-out code, no TODO on main.
+
+## Currency, in components
+
+Seed data is genuinely multi-currency (USD, EUR, GBP). `.claude/rules/money.md`
+carries the rule that summing across currencies without converting is a bug, but
+its `paths` cover `src/lib`, `src/app/api` and `src/data` — not `.tsx` files. So
+the rule does not load in the one place totals get rendered.
+
+In components: render a total only when every amount in it shares a currency.
+Otherwise group by currency and render one total per group.
